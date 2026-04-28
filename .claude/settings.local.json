@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "Bash(python3 -c \"import pandas; print\\('ok'\\)\")",
+      "Bash(python -c \"import pandas; print\\('ok'\\)\")",
+      "PowerShell(pip install pandas openpyxl --user -q)",
+      "PowerShell(python -c \"import pandas as pd; print\\(pd.__version__\\)\")",
+      "PowerShell(python --version)",
+      "PowerShell(python -m pip install pandas openpyxl streamlit plotly openai python-dotenv -q 2>&1)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8501\" -UseBasicParsing -TimeoutSec 5)",
+      "PowerShell(python -m pip install google-genai -q 2>&1)",
+      "PowerShell(python -c \"from google import genai; print\\('google-genai version:', genai.__version__\\)\")"
+    ]
+  }
+}
