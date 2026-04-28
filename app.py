@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 from sector_map import SECTOR_MAP
 from data_loader import load_excel, sync_to_db
@@ -204,9 +204,14 @@ def sidebar():
 
         st.markdown("---")
         # Load key: st.secrets (Streamlit Cloud) → .env
-        _secret_key = st.secrets.get("GOOGLE_API_KEY", "") if hasattr(st, "secrets") else ""
+        try:
+            _secret_key = st.secrets.get("GOOGLE_API_KEY", "")
+        except Exception:
+            _secret_key = ""
         _env_key = os.getenv("GOOGLE_API_KEY", "")
-        _active_key = _secret_key or _env_key
+        # Only use secret key if it looks real (starts with "AIza" and is long enough)
+        _valid_secret = _secret_key if (len(_secret_key) > 10 and not _secret_key.startswith("AIza...")) else ""
+        _active_key = _valid_secret or _env_key
         if _active_key:
             os.environ["GOOGLE_API_KEY"] = _active_key
 
@@ -417,6 +422,9 @@ def _run_bulk_research(names):
             row.get("industry_name") if row else None,
             client
         )
+        if "_error" in result:
+            st.warning(f"Ошибка для {name}: {result['_error']}")
+            continue
         save_research(name, result)
         prog.progress((i + 1) / len(names))
     prog.empty()
@@ -452,6 +460,15 @@ def page_detail():
             st.markdown(f"**Приоритет КЗ:**")
             st.markdown(badge(lk), unsafe_allow_html=True)
 
+    # Research action buttons (top)
+    if os.getenv("GOOGLE_API_KEY"):
+        is_done = row.get("research_status") == "researched"
+        btn_label = "🔄 Обновить AI исследование" if is_done else "🤖 Запустить AI исследование"
+        if st.button(btn_label, type="primary"):
+            _run_single_research(row)
+    else:
+        st.warning("Добавьте Google API Key в файл `.env` для запуска исследования.")
+
     st.markdown("---")
 
     # ── A. Financial data ─────────────────────────────────────────────────
@@ -475,16 +492,10 @@ def page_detail():
         st.markdown(f"**Рост:** <span style='color:{color};font-size:16px'>{arrow} {fmt_pct(grow)}</span>",
                     unsafe_allow_html=True)
 
-    # AI Research
     is_researched = row.get("research_status") == "researched"
 
     if not is_researched:
-        st.markdown('<div class="section-header">B. AI Исследование</div>', unsafe_allow_html=True)
-        if os.getenv("GOOGLE_API_KEY"):
-            if st.button("🤖 Запустить AI исследование", type="primary"):
-                _run_single_research(row)
-        else:
-            st.info("Введите Google API ключ в боковой панели для запуска исследования.")
+        st.info("Нажмите кнопку выше, чтобы запустить AI исследование.")
         return
 
     # ── B. AI Research block ───────────────────────────────────────────────
@@ -601,11 +612,6 @@ def page_detail():
                 st.markdown(f'<a class="source-link" href="{url}" target="_blank">🔗 {url}</a>',
                             unsafe_allow_html=True)
 
-    # Re-research button
-    st.markdown("---")
-    if os.getenv("GOOGLE_API_KEY"):
-        if st.button("🔄 Обновить AI исследование"):
-            _run_single_research(row)
 
 
 def _run_single_research(row):
@@ -618,7 +624,10 @@ def _run_single_research(row):
             row.get("industry_name"),
             client
         )
-        save_research(row["company_name"], result)
+    if "_error" in result:
+        st.error(f"Ошибка API: {result['_error']}")
+        return
+    save_research(row["company_name"], result)
     st.success("Исследование завершено!")
     st.rerun()
 
