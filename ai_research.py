@@ -1,6 +1,6 @@
 """
 AI research agent using Gemini 2.5 Flash-Lite with Google Search grounding.
-Produces structured consultant-style briefing for each Korean company.
+Source URLs are extracted from grounding_metadata (actual site URLs, not search links).
 """
 
 import json
@@ -15,13 +15,12 @@ SYSTEM_PROMPT = """Ты — аналитик-консультант уровня
 
 Правила:
 - Используй веб-поиск для проверки фактов
-- Каждое утверждение должно подкрепляться источником (URL)
 - Если данные не найдены — пиши "Не подтверждено"
 - НЕ придумывай факты
 - Стиль — профессиональный, сжатый, как в консалтинговом отчёте
-- Ответ ВСЕГДА в формате JSON
+- Ответ ВСЕГДА строго в формате JSON без markdown-обёртки
 
-Структура ответа (строго JSON):
+Структура ответа:
 {
   "business_description": "Краткое описание компании (2-3 предложения)",
   "main_products": "Основные продукты/услуги (перечень через ; )",
@@ -43,8 +42,7 @@ SYSTEM_PROMPT = """Ты — аналитик-консультант уровня
   "likelihood_reasoning": "Обоснование оценки (3-5 предложений): наличие региональной базы, сектор, спрос в КЗ",
   "why_kazakhstan": ["тезис 1", "тезис 2", "тезис 3"],
   "engagement_format": "Рекомендуемые форматы сотрудничества: локализация / СП / поставки / EPC / технологии",
-  "negotiation_questions": ["вопрос 1", "вопрос 2", "вопрос 3"],
-  "source_links": ["url1", "url2", "url3"]
+  "negotiation_questions": ["вопрос 1", "вопрос 2", "вопрос 3"]
 }"""
 
 
@@ -52,13 +50,35 @@ def make_client(api_key: str) -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+def _extract_grounding_urls(response) -> list[str]:
+    """Extract actual website URLs from Gemini grounding metadata."""
+    urls = []
+    try:
+        for candidate in response.candidates:
+            meta = getattr(candidate, "grounding_metadata", None)
+            if not meta:
+                continue
+            chunks = getattr(meta, "grounding_chunks", []) or []
+            for chunk in chunks:
+                web = getattr(chunk, "web", None)
+                if web:
+                    uri = getattr(web, "uri", None)
+                    if uri and not uri.startswith("https://www.google.com/search"):
+                        urls.append(uri)
+    except Exception:
+        pass
+    # Deduplicate while preserving order
+    seen = set()
+    return [u for u in urls if not (u in seen or seen.add(u))]
+
+
 def research_company(company_name: str, sector: str, industry_name: str,
                      client: genai.Client) -> dict:
     user_prompt = (
-        f"Исследуй корейскую компанию: **{company_name}**\n"
+        f"Исследуй корейскую компанию: {company_name}\n"
         f"Сектор: {sector or 'не указан'}\n"
         f"Отрасль: {industry_name or 'не указана'}\n\n"
-        f"Выполни анализ по схеме и верни строго JSON без markdown-обёртки."
+        f"Верни строго JSON без markdown-обёртки."
     )
 
     try:
@@ -81,7 +101,13 @@ def research_company(company_name: str, sector: str, industry_name: str,
             end = len(lines) - 1 if lines[-1].strip() == "```" else len(lines)
             text = "\n".join(lines[start:end])
 
-        return json.loads(text)
+        result = json.loads(text)
+
+        # Always override source_links with real grounded URLs from metadata
+        grounded_urls = _extract_grounding_urls(response)
+        result["source_links"] = grounded_urls if grounded_urls else result.get("source_links", [])
+
+        return result
 
     except json.JSONDecodeError:
         return _fallback_response()
