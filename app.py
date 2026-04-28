@@ -188,8 +188,15 @@ def sidebar():
             st.rerun()
 
         st.markdown("---")
+        # Load key: st.secrets (Streamlit Cloud) → .env → user input
+        _secret_key = st.secrets.get("GOOGLE_API_KEY", "") if hasattr(st, "secrets") else ""
+        _env_key = os.getenv("GOOGLE_API_KEY", "")
+        _default_key = _secret_key or _env_key
+        if _default_key:
+            os.environ["GOOGLE_API_KEY"] = _default_key
+
         api_key = st.text_input("Google API Key", type="password",
-                                 value=os.getenv("GOOGLE_API_KEY", ""),
+                                 value=_default_key,
                                  help="Для AI-исследования (Gemini 2.5 Flash-Lite)")
         if api_key:
             os.environ["GOOGLE_API_KEY"] = api_key

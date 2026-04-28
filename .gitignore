@@ -1,0 +1,6 @@
+.env
+.streamlit/secrets.toml
+radar.db
+__pycache__/
+*.pyc
+companies_upload.xlsx
