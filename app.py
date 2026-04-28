@@ -31,12 +31,21 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
 
-    .main { background-color: #ffffff; }
+    :root {
+        --radar-border: rgba(127, 127, 127, 0.24);
+        --radar-sidebar-bg: #1a2e3b;
+        --radar-sidebar-text: #c8d8e4;
+    }
+
+    .stApp, [data-testid="stAppViewContainer"], .main {
+        background-color: var(--background-color, #ffffff);
+        color: var(--text-color, #1a2e3b);
+    }
 
     .kpi-card {
-        background: #ffffff;
-        border: 1px solid #e8edf2;
-        border-left: 4px solid #376c8a;
+        background: var(--secondary-background-color, #f8fafb);
+        border: 1px solid var(--radar-border);
+        border-left: 4px solid var(--primary-color, #376c8a);
         border-radius: 6px;
         padding: 16px 20px;
         margin-bottom: 8px;
@@ -44,7 +53,8 @@ st.markdown("""
     .kpi-label {
         font-size: 12px;
         font-weight: 500;
-        color: #7a8fa0;
+        color: var(--text-color, #1a2e3b);
+        opacity: 0.68;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin-bottom: 4px;
@@ -52,23 +62,24 @@ st.markdown("""
     .kpi-value {
         font-size: 26px;
         font-weight: 700;
-        color: #1a2e3b;
+        color: var(--text-color, #1a2e3b);
     }
     .kpi-sub {
         font-size: 12px;
-        color: #7a8fa0;
+        color: var(--text-color, #1a2e3b);
+        opacity: 0.68;
         margin-top: 2px;
     }
 
     .section-header {
         font-size: 11px;
         font-weight: 600;
-        color: #376c8a;
+        color: var(--primary-color, #376c8a);
         text-transform: uppercase;
         letter-spacing: 0.1em;
         margin: 24px 0 8px 0;
         padding-bottom: 6px;
-        border-bottom: 1px solid #e8edf2;
+        border-bottom: 1px solid var(--radar-border);
     }
 
     .badge-high { background:#d4edda; color:#155724; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; }
@@ -78,35 +89,39 @@ st.markdown("""
     .badge-not { background:#f2f2f2; color:#6c757d; padding:2px 8px; border-radius:12px; font-size:12px; }
 
     .briefing-block {
-        background: #f8fafb;
-        border: 1px solid #e8edf2;
+        background: var(--secondary-background-color, #f8fafb);
+        border: 1px solid var(--radar-border);
         border-radius: 6px;
         padding: 16px 20px;
         margin-bottom: 12px;
+        color: var(--text-color, #1a2e3b);
+    }
+    .briefing-block p {
+        color: var(--text-color, #1a2e3b);
     }
 
     .source-link {
         font-size: 12px;
-        color: #376c8a;
+        color: var(--primary-color, #376c8a);
         word-break: break-all;
     }
 
     div[data-testid="stSidebar"] {
-        background: #1a2e3b;
+        background: var(--radar-sidebar-bg);
     }
     div[data-testid="stSidebar"] * {
-        color: #c8d8e4 !important;
+        color: var(--radar-sidebar-text) !important;
     }
     div[data-testid="stSidebar"] .stSelectbox label,
     div[data-testid="stSidebar"] .stMultiSelect label,
     div[data-testid="stSidebar"] .stSlider label {
-        color: #c8d8e4 !important;
+        color: var(--radar-sidebar-text) !important;
         font-size: 12px !important;
     }
 
-    h1 { font-size: 22px !important; font-weight: 700 !important; color: #1a2e3b !important; }
-    h2 { font-size: 17px !important; font-weight: 600 !important; color: #1a2e3b !important; }
-    h3 { font-size: 14px !important; font-weight: 600 !important; color: #376c8a !important; }
+    h1 { font-size: 22px !important; font-weight: 700 !important; color: var(--text-color, #1a2e3b) !important; }
+    h2 { font-size: 17px !important; font-weight: 600 !important; color: var(--text-color, #1a2e3b) !important; }
+    h3 { font-size: 14px !important; font-weight: 600 !important; color: var(--primary-color, #376c8a) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -188,18 +203,27 @@ def sidebar():
             st.rerun()
 
         st.markdown("---")
-        # Load key: st.secrets (Streamlit Cloud) → .env → user input
+        # Load key: st.secrets (Streamlit Cloud) → .env
         _secret_key = st.secrets.get("GOOGLE_API_KEY", "") if hasattr(st, "secrets") else ""
         _env_key = os.getenv("GOOGLE_API_KEY", "")
-        _default_key = _secret_key or _env_key
-        if _default_key:
-            os.environ["GOOGLE_API_KEY"] = _default_key
+        _active_key = _secret_key or _env_key
+        if _active_key:
+            os.environ["GOOGLE_API_KEY"] = _active_key
 
-        api_key = st.text_input("Google API Key", type="password",
-                                 value=_default_key,
-                                 help="Для AI-исследования (Gemini 2.5 Flash-Lite)")
-        if api_key:
-            os.environ["GOOGLE_API_KEY"] = api_key
+        if _active_key:
+            st.markdown("**Google API Key**")
+            st.markdown("✅ Ключ настроен")
+            new_key = st.text_input("Заменить ключ", type="password",
+                                     value="", placeholder="Вставьте новый ключ...",
+                                     label_visibility="collapsed")
+            if new_key:
+                os.environ["GOOGLE_API_KEY"] = new_key
+        else:
+            new_key = st.text_input("Google API Key", type="password",
+                                     value="",
+                                     help="Для AI-исследования (Gemini 2.5 Flash-Lite)")
+            if new_key:
+                os.environ["GOOGLE_API_KEY"] = new_key
 
 
 # ─── DASHBOARD ───────────────────────────────────────────────────────────────
@@ -275,7 +299,6 @@ def page_dashboard():
                      title="Компании по секторам",
                      color_discrete_sequence=[ACCENT])
         fig.update_layout(height=520, yaxis_title="", xaxis_title="Компаний",
-                          plot_bgcolor="white", paper_bgcolor="white",
                           title_font_size=13, margin=dict(l=0, r=10, t=40, b=20))
         st.plotly_chart(fig, use_container_width=True)
 
@@ -287,7 +310,6 @@ def page_dashboard():
                       title="Компании по отраслям (топ-15)",
                       color_discrete_sequence=["#5a9ab5"])
         fig3.update_layout(height=520, yaxis_title="", xaxis_title="Компаний",
-                           plot_bgcolor="white", paper_bgcolor="white",
                            title_font_size=13, margin=dict(l=0, r=10, t=40, b=20))
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -529,7 +551,7 @@ def page_detail():
     <div class="briefing-block">
         <div class="kpi-label">Вероятность</div>
         <span style="font-size:20px; font-weight:700; color:{lk_color}">{lk_val}</span>
-        <p style="margin:8px 0 0 0; color:#444">{row.get('likelihood_reasoning', '—')}</p>
+        <p style="margin:8px 0 0 0">{row.get('likelihood_reasoning', '—')}</p>
     </div>
     """, unsafe_allow_html=True)
 
