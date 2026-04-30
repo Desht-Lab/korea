@@ -246,27 +246,13 @@ def page_dashboard():
 
     # ── Filters ──────────────────────────────────────────────────────────────
     with st.expander("🔧 Фильтры", expanded=False):
-        col1, col2 = st.columns(2)
         sectors = sorted(db_df["sector"].dropna().unique())
-        sel_sector = col1.multiselect("Сектор", sectors,
-                                      format_func=lambda x: sector_label(x))
-        cats = sorted(db_df["market_category"].dropna().unique())
-        sel_cat = col2.multiselect("Market Category", cats)
-
-        rev_max = float(db_df["revenue_current_usd"].max(skipna=True) or 1e9)
-        rev_range = st.slider("Выручка USD (диапазон)",
-                               0.0, rev_max, (0.0, rev_max),
-                               format="%.0f")
+        sel_sector = st.multiselect("Сектор", sectors,
+                                    format_func=lambda x: sector_label(x))
 
     fdf = db_df.copy()
     if sel_sector:
         fdf = fdf[fdf["sector"].isin(sel_sector)]
-    if sel_cat:
-        fdf = fdf[fdf["market_category"].isin(sel_cat)]
-    fdf = fdf[
-        (fdf["revenue_current_usd"].fillna(0) >= rev_range[0]) &
-        (fdf["revenue_current_usd"].fillna(0) <= rev_range[1])
-    ]
 
     # ── KPIs ─────────────────────────────────────────────────────────────────
     total = len(fdf)
@@ -277,7 +263,7 @@ def page_dashboard():
 
     c1, c2, c3, c4, c5 = st.columns(5)
     for col, label, val, sub in [
-        (c1, "Компаний", f"{total:,}", "уникальных"),
+        (c1, "Компаний", f"{total:,}".replace(",", " "), "уникальных"),
         (c2, "Суммарная выручка", fmt_usd(total_rev), "последний период"),
         (c3, "Средняя выручка", fmt_usd(avg_rev), "на компанию"),
         (c4, "Исследовано AI", f"{researched}", f"из {total}"),
@@ -321,18 +307,21 @@ def page_dashboard():
     # ── Top 10 ───────────────────────────────────────────────────────────────
     st.markdown('<div class="section-header">Топ-10 компаний по выручке</div>', unsafe_allow_html=True)
     top10 = fdf.nlargest(10, "revenue_current_usd")[
-        ["company_name", "sector", "industry_name", "revenue_current_usd", "revenue_growth", "likelihood_kz"]
+        ["company_name", "sector", "industry_name", "revenue_current_usd", "revenue_growth"]
     ].copy()
-    top10["Выручка USD"] = top10["revenue_current_usd"].apply(fmt_usd)
-    top10["Рост %"] = top10["revenue_growth"].apply(lambda x: fmt_pct(x) if pd.notna(x) else "—")
     top10["Сектор"] = top10["sector"].apply(lambda x: sector_label(x) if x else "—")
+    top10["revenue_current_usd"] = top10["revenue_current_usd"] / 1e6
     top10 = top10.rename(columns={
         "company_name": "Компания", "industry_name": "Отрасль",
-        "likelihood_kz": "КЗ приоритет"
+        "revenue_current_usd": "Выручка млн USD (2025)", "revenue_growth": "Рост % (2025/2024)",
     })
     st.dataframe(
-        top10[["Компания", "Сектор", "Отрасль", "Выручка USD", "Рост %", "КЗ приоритет"]],
-        use_container_width=True, hide_index=True
+        top10[["Компания", "Сектор", "Отрасль", "Выручка млн USD (2025)", "Рост % (2025/2024)"]],
+        use_container_width=True, hide_index=True,
+        column_config={
+            "Выручка млн USD (2025)": st.column_config.NumberColumn("Выручка млн USD (2025)", format="$ %,.2f"),
+            "Рост % (2025/2024)": st.column_config.NumberColumn("Рост % (2025/2024)", format="%.2f%%"),
+        }
     )
 
 
@@ -349,30 +338,20 @@ def page_companies():
         return
 
     # Search & filters
-    col_s, col_f1, col_f2, col_f3 = st.columns([3, 1, 1, 1])
+    col_s, col_f1 = st.columns([3, 1])
     search = col_s.text_input("🔍 Поиск по названию", "")
-    sel_sec = col_f1.selectbox("Сектор", ["Все"] + sorted(db_df["sector"].dropna().unique().tolist()))
-    sel_cat = col_f2.selectbox("Market Cat", ["Все"] + sorted(db_df["market_category"].dropna().unique().tolist()))
-    sel_lk = col_f3.selectbox("КЗ приоритет", ["Все", "High", "Medium", "Low"])
+    sel_sec = col_f1.selectbox("Сектор", ["Все"] + sorted(db_df["sector"].dropna().unique().tolist()),
+                               format_func=lambda x: sector_label(x) if x != "Все" else x)
 
     fdf = db_df.copy()
     if search:
         fdf = fdf[fdf["company_name"].str.contains(search, case=False, na=False)]
     if sel_sec != "Все":
         fdf = fdf[fdf["sector"] == sel_sec]
-    if sel_cat != "Все":
-        fdf = fdf[fdf["market_category"] == sel_cat]
-    if sel_lk != "Все":
-        fdf = fdf[fdf["likelihood_kz"] == sel_lk]
 
-    # Sort
-    sort_col = st.selectbox("Сортировать по", ["revenue_current_usd", "revenue_growth", "company_name"],
-                            format_func=lambda x: {"revenue_current_usd": "Выручка USD",
-                                                    "revenue_growth": "Рост %",
-                                                    "company_name": "Название"}[x])
-    fdf = fdf.sort_values(sort_col, ascending=sort_col == "company_name", na_position="last")
+    fdf = fdf.sort_values("revenue_current_usd", ascending=False, na_position="last")
 
-    st.markdown(f"**{len(fdf):,}** компаний")
+    st.markdown(f"**{len(fdf):,}** компаний".replace(",", " "))
 
     # Bulk research
     if os.getenv("GOOGLE_API_KEY"):
@@ -382,28 +361,29 @@ def page_companies():
             _run_bulk_research(sel_names)
 
     # Table
-    display = fdf[["company_name", "sector", "industry_name", "market_category",
-                   "revenue_current_usd", "revenue_growth",
-                   "research_status", "likelihood_kz"]].copy()
-    display["Выручка USD"] = display["revenue_current_usd"].apply(fmt_usd)
-    display["Рост %"] = display["revenue_growth"].apply(lambda x: fmt_pct(x) if pd.notna(x) else "—")
+    display = fdf[["company_name", "sector", "industry_name",
+                   "revenue_current_usd", "revenue_growth"]].copy().reset_index(drop=True)
     display["Сектор"] = display["sector"].apply(lambda x: sector_label(x) if x else "—")
+    display["revenue_current_usd"] = display["revenue_current_usd"] / 1e6
     display = display.rename(columns={
         "company_name": "Компания", "industry_name": "Отрасль",
-        "market_category": "Кат.", "research_status": "AI статус",
-        "likelihood_kz": "КЗ"
+        "revenue_current_usd": "Выручка млн USD (2025)", "revenue_growth": "Рост % (2025/2024)",
     })
 
-    st.dataframe(
-        display[["Компания", "Сектор", "Отрасль", "Кат.", "Выручка USD", "Рост %", "AI статус", "КЗ"]],
-        use_container_width=True, hide_index=True
+    st.caption("Кликните на строку чтобы открыть карточку компании")
+    event = st.dataframe(
+        display[["Компания", "Сектор", "Отрасль", "Выручка млн USD (2025)", "Рост % (2025/2024)"]],
+        use_container_width=True, hide_index=True,
+        on_select="rerun", selection_mode="single-row",
+        column_config={
+            "Выручка млн USD (2025)": st.column_config.NumberColumn("Выручка млн USD (2025)", format="$ %,.2f"),
+            "Рост % (2025/2024)": st.column_config.NumberColumn("Рост % (2025/2024)", format="%.2f%%"),
+        }
     )
 
-    st.markdown("---")
-    st.markdown("**Открыть карточку компании:**")
-    chosen = st.selectbox("Выбрать компанию", [""] + fdf["company_name"].tolist(),
-                          format_func=lambda x: x or "— выберите —")
-    if chosen:
+    rows = event.selection.rows
+    if rows:
+        chosen = display.iloc[rows[0]]["Компания"]
         st.session_state.selected_company = chosen
         st.session_state.page = "detail"
         st.rerun()
@@ -453,7 +433,7 @@ def page_detail():
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown(f"# {name}")
-        st.markdown(f"*{sector_label(row.get('sector'))} · {row.get('industry_name', '—')} · {row.get('market_category', '—')}*")
+        st.markdown(f"*{sector_label(row.get('sector'))} · {row.get('industry_name', '—')}*")
     with col_h2:
         lk = row.get("likelihood_kz")
         if lk:
@@ -506,19 +486,28 @@ def page_detail():
         <div class="kpi-label">Чем занимается</div>
         <p style="margin:6px 0 0 0">{row.get('business_description', '—')}</p>
     </div>
-    <div class="briefing-block">
-        <div class="kpi-label">Основные продукты / услуги</div>
-        <p style="margin:6px 0 0 0">{row.get('main_products', '—')}</p>
-    </div>
-    <div class="briefing-block">
-        <div class="kpi-label">Штаб-квартира</div>
-        <p style="margin:6px 0 0 0">{row.get('headquarters_location', '—')}</p>
-    </div>
-    <div class="briefing-block">
-        <div class="kpi-label">Производственные мощности</div>
-        <p style="margin:6px 0 0 0">{row.get('production_locations', '—')}</p>
-    </div>
     """, unsafe_allow_html=True)
+
+    st.markdown('<div class="kpi-label" style="margin-bottom:6px">Продукция и производственные мощности</div>', unsafe_allow_html=True)
+    prod_table = row.get("production_table")
+    if isinstance(prod_table, str):
+        try:
+            prod_table = json.loads(prod_table)
+        except Exception:
+            prod_table = []
+    if prod_table and isinstance(prod_table, list) and len(prod_table) > 0:
+        prod_df = pd.DataFrame(prod_table).rename(columns={
+            "product": "Продукция",
+            "facility": "Завод / Фасилити",
+            "location": "Локация",
+        })
+        for col in ["Продукция", "Завод / Фасилити", "Локация"]:
+            if col not in prod_df.columns:
+                prod_df[col] = "—"
+        st.dataframe(prod_df[["Продукция", "Завод / Фасилити", "Локация"]],
+                     use_container_width=True, hide_index=True)
+    else:
+        st.markdown("*Не подтверждено*")
 
     # ── Regional presence ─────────────────────────────────────────────────
     st.markdown('<div class="section-header">C. Присутствие в регионе</div>', unsafe_allow_html=True)
@@ -541,17 +530,28 @@ def page_detail():
         else:
             st.markdown(row.get("kazakhstan_presence", "—"))
 
-    countries = [
-        ("🇺🇿 Узбекистан", "uzbekistan_presence"),
-        ("🇦🇿 Азербайджан", "azerbaijan_presence"),
-        ("🇬🇪 Грузия", "georgia_presence"),
-        ("🇦🇲 Армения", "armenia_presence"),
-        ("🇰🇬 Кыргызстан", "kyrgyzstan_presence"),
-    ]
-    for label, field in countries:
-        val = row.get(field, "—") or "Не подтверждено"
-        with st.expander(label):
-            st.write(val)
+    def _parse_presence(raw):
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {}
+        return raw or {}
+
+    ca = _parse_presence(row.get("central_asia_presence"))
+    with st.expander("🇺🇿🇰🇬 Центральная Азия (Узбекистан, Кыргызстан)"):
+        st.markdown(f"**Узбекистан:** {ca.get('uzbekistan', 'Не подтверждено')}")
+        st.markdown(f"**Кыргызстан:** {ca.get('kyrgyzstan', 'Не подтверждено')}")
+        if ca.get("summary"):
+            st.markdown(f"*{ca['summary']}*")
+
+    cau = _parse_presence(row.get("caucasus_presence"))
+    with st.expander("🇦🇿🇦🇲🇬🇪 Кавказ (Азербайджан, Армения, Грузия)"):
+        st.markdown(f"**Азербайджан:** {cau.get('azerbaijan', 'Не подтверждено')}")
+        st.markdown(f"**Армения:** {cau.get('armenia', 'Не подтверждено')}")
+        st.markdown(f"**Грузия:** {cau.get('georgia', 'Не подтверждено')}")
+        if cau.get("summary"):
+            st.markdown(f"*{cau['summary']}*")
 
     # ── D. KZ Opportunity Scoring ─────────────────────────────────────────
     st.markdown('<div class="section-header">D. Оценка выхода в Казахстан</div>', unsafe_allow_html=True)

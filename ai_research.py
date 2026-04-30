@@ -23,21 +23,30 @@ SYSTEM_PROMPT = """Ты — аналитик-консультант уровня
 Структура ответа:
 {
   "business_description": "Краткое описание компании (2-3 предложения)",
-  "main_products": "Основные продукты/услуги (перечень через ; )",
-  "headquarters_location": "Город, провинция, Корея",
-  "production_locations": "Где находятся производственные мощности",
+  "production_table": [
+    {
+      "product": "Название продукта или линейки",
+      "facility": "Название завода, фабрики или офиса (или 'Штаб-квартира')",
+      "location": "Город, провинция/страна"
+    }
+  ],
   "kazakhstan_presence": {
     "exists": true/false,
     "projects": "описание проектов или Не подтверждено",
     "partners": "партнёры/дистрибьюторы или Не подтверждено",
     "details": "подробности"
   },
-  "uzbekistan_presence": "описание или Не подтверждено",
-  "azerbaijan_presence": "описание или Не подтверждено",
-  "georgia_presence": "описание или Не подтверждено",
-  "armenia_presence": "описание или Не подтверждено",
-  "kyrgyzstan_presence": "описание или Не подтверждено",
-  "central_asia_presence": "Сводное описание присутствия в ЦА",
+  "central_asia_presence": {
+    "uzbekistan": "описание или Не подтверждено",
+    "kyrgyzstan": "описание или Не подтверждено",
+    "summary": "Сводное описание присутствия в ЦА (Узбекистан + Кыргызстан)"
+  },
+  "caucasus_presence": {
+    "azerbaijan": "описание или Не подтверждено",
+    "armenia": "описание или Не подтверждено",
+    "georgia": "описание или Не подтверждено",
+    "summary": "Сводное описание присутствия на Кавказе"
+  },
   "likelihood_kz": "High/Medium/Low",
   "likelihood_reasoning": "Обоснование оценки (3-5 предложений): наличие региональной базы, сектор, спрос в КЗ",
   "why_kazakhstan": ["тезис 1", "тезис 2", "тезис 3"],
@@ -118,21 +127,24 @@ def research_company(company_name: str, sector: str, industry_name: str,
 def _fallback_response() -> dict:
     return {
         "business_description": "Не подтверждено",
-        "main_products": "Не подтверждено",
-        "headquarters_location": "Не подтверждено",
-        "production_locations": "Не подтверждено",
+        "production_table": [],
         "kazakhstan_presence": {
             "exists": False,
             "projects": "Не подтверждено",
             "partners": "Не подтверждено",
             "details": "Не подтверждено",
         },
-        "uzbekistan_presence": "Не подтверждено",
-        "azerbaijan_presence": "Не подтверждено",
-        "georgia_presence": "Не подтверждено",
-        "armenia_presence": "Не подтверждено",
-        "kyrgyzstan_presence": "Не подтверждено",
-        "central_asia_presence": "Не подтверждено",
+        "central_asia_presence": {
+            "uzbekistan": "Не подтверждено",
+            "kyrgyzstan": "Не подтверждено",
+            "summary": "Не подтверждено",
+        },
+        "caucasus_presence": {
+            "azerbaijan": "Не подтверждено",
+            "armenia": "Не подтверждено",
+            "georgia": "Не подтверждено",
+            "summary": "Не подтверждено",
+        },
         "likelihood_kz": "Low",
         "likelihood_reasoning": "Данные не найдены",
         "why_kazakhstan": ["Требует дополнительного анализа"],
