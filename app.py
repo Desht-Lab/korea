@@ -451,7 +451,7 @@ def page_detail():
     st.markdown("---")
 
     # ── A. Financial data ─────────────────────────────────────────────────
-    st.markdown('<div class="section-header">A. Финансовые показатели</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">A. Выручка</div>', unsafe_allow_html=True)
     fc1, fc2, fc3 = st.columns(3)
     for col, label, val in [
         (fc1, "2025", fmt_usd(row.get("revenue_current_usd"))),
@@ -579,10 +579,21 @@ def page_detail():
     # ── E. Engagement Strategy ────────────────────────────────────────────
     st.markdown('<div class="section-header">E. Стратегия вовлечения</div>', unsafe_allow_html=True)
 
+    eng_fmt = row.get('engagement_format', '—')
+    if isinstance(eng_fmt, str):
+        try:
+            eng_fmt = json.loads(eng_fmt)
+        except Exception:
+            eng_fmt = [eng_fmt] if eng_fmt and eng_fmt != '—' else None
+    if eng_fmt and isinstance(eng_fmt, list):
+        eng_fmt_html = "".join(f"<li>{item}</li>" for item in eng_fmt)
+        eng_fmt_content = f"<ul style='margin:6px 0 0 0; padding-left:20px'>{eng_fmt_html}</ul>"
+    else:
+        eng_fmt_content = f"<p style='margin:6px 0 0 0'>{'—' if not eng_fmt else eng_fmt}</p>"
     st.markdown(f"""
     <div class="briefing-block">
         <div class="kpi-label">Форматы сотрудничества</div>
-        <p style="margin:6px 0 0 0">{row.get('engagement_format', '—')}</p>
+        {eng_fmt_content}
     </div>
     """, unsafe_allow_html=True)
 
