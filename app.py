@@ -245,10 +245,9 @@ def page_dashboard():
         return
 
     # ── Filters ──────────────────────────────────────────────────────────────
-    with st.expander("🔧 Фильтры", expanded=False):
-        sectors = sorted(db_df["sector"].dropna().unique())
-        sel_sector = st.multiselect("Сектор", sectors,
-                                    format_func=lambda x: sector_label(x))
+    sectors = sorted(db_df["sector"].dropna().unique())
+    sel_sector = st.multiselect("Фильтр по секторам", sectors,
+                                format_func=lambda x: sector_label(x))
 
     fdf = db_df.copy()
     if sel_sector:
@@ -455,9 +454,9 @@ def page_detail():
     st.markdown('<div class="section-header">A. Финансовые показатели</div>', unsafe_allow_html=True)
     fc1, fc2, fc3 = st.columns(3)
     for col, label, val in [
-        (fc1, "Текущий период", fmt_usd(row.get("revenue_current_usd"))),
-        (fc2, "Предыдущий период", fmt_usd(row.get("revenue_previous_usd"))),
-        (fc3, "Период до предыдущего", fmt_usd(row.get("revenue_term_before_usd"))),
+        (fc1, "2025", fmt_usd(row.get("revenue_current_usd"))),
+        (fc2, "2024", fmt_usd(row.get("revenue_previous_usd"))),
+        (fc3, "2023", fmt_usd(row.get("revenue_term_before_usd"))),
     ]:
         col.markdown(f"""
         <div class="kpi-card">

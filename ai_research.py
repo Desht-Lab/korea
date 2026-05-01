@@ -101,6 +101,8 @@ def research_company(company_name: str, sector: str, industry_name: str,
             ),
         )
 
+        if not response.text:
+            return _fallback_response()
         text = response.text.strip()
 
         # Strip markdown fences if present
