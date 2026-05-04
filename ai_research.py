@@ -59,6 +59,33 @@ def make_client(api_key: str) -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+def _get_response_text(response) -> str:
+    """Extract non-thought text from a Gemini response (handles thinking models)."""
+    # Try convenience property first (works in most SDK versions)
+    try:
+        if response.text:
+            return response.text
+    except Exception:
+        pass
+
+    # Fall back to manual extraction, skipping thought parts
+    parts = []
+    try:
+        for candidate in (response.candidates or []):
+            content = getattr(candidate, "content", None)
+            if not content:
+                continue
+            for part in (content.parts or []):
+                if getattr(part, "thought", False):
+                    continue
+                text = getattr(part, "text", None)
+                if text:
+                    parts.append(text)
+    except Exception:
+        pass
+    return "\n".join(parts)
+
+
 def _extract_grounding_urls(response) -> list[str]:
     """Extract actual website URLs from Gemini grounding metadata."""
     urls = []
@@ -137,10 +164,11 @@ def research_company(company_name: str, sector: str, industry_name: str,
             ),
         )
 
-        if not response.text:
+        text = _get_response_text(response)
+        if not text:
             return {**_fallback_response(), "_error": "Empty response from model"}
 
-        result = _extract_json(response.text)
+        result = _extract_json(text)
 
         # Always override source_links with real grounded URLs from metadata
         grounded_urls = _extract_grounding_urls(response)
@@ -149,7 +177,7 @@ def research_company(company_name: str, sector: str, industry_name: str,
         return result
 
     except json.JSONDecodeError as e:
-        raw_preview = (response.text[:300] if "response" in dir() else "")
+        raw_preview = (text[:300] if "text" in dir() else "")
         return {**_fallback_response(), "_error": f"JSON parse error: {e} | Raw: {raw_preview}"}
     except Exception as e:
         return {**_fallback_response(), "_error": str(e)}
