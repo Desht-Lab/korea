@@ -81,6 +81,42 @@ def _extract_grounding_urls(response) -> list[str]:
     return [u for u in urls if not (u in seen or seen.add(u))]
 
 
+def _extract_json(text: str) -> dict:
+    """Extract JSON from text, handling markdown fences and preamble text."""
+    text = text.strip()
+
+    # Strip markdown fences (handles ```json ... ``` or ``` ... ```)
+    if "```" in text:
+        fence_start = text.find("```")
+        newline_after_fence = text.find("\n", fence_start)
+        fence_end = text.rfind("```")
+        if newline_after_fence != -1 and fence_end > newline_after_fence:
+            text = text[newline_after_fence + 1:fence_end].strip()
+
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Find JSON object by scanning for matching braces (handles preamble text)
+    brace_start = text.find("{")
+    if brace_start != -1:
+        depth = 0
+        for i, ch in enumerate(text[brace_start:], brace_start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[brace_start:i + 1])
+                    except json.JSONDecodeError:
+                        break
+
+    raise json.JSONDecodeError("No valid JSON found in response", text, 0)
+
+
 def research_company(company_name: str, sector: str, industry_name: str,
                      client: genai.Client) -> dict:
     user_prompt = (
@@ -102,17 +138,9 @@ def research_company(company_name: str, sector: str, industry_name: str,
         )
 
         if not response.text:
-            return _fallback_response()
-        text = response.text.strip()
+            return {**_fallback_response(), "_error": "Empty response from model"}
 
-        # Strip markdown fences if present
-        if text.startswith("```"):
-            lines = text.splitlines()
-            start = 1
-            end = len(lines) - 1 if lines[-1].strip() == "```" else len(lines)
-            text = "\n".join(lines[start:end])
-
-        result = json.loads(text)
+        result = _extract_json(response.text)
 
         # Always override source_links with real grounded URLs from metadata
         grounded_urls = _extract_grounding_urls(response)
@@ -120,8 +148,9 @@ def research_company(company_name: str, sector: str, industry_name: str,
 
         return result
 
-    except json.JSONDecodeError:
-        return _fallback_response()
+    except json.JSONDecodeError as e:
+        raw_preview = (response.text[:300] if "response" in dir() else "")
+        return {**_fallback_response(), "_error": f"JSON parse error: {e} | Raw: {raw_preview}"}
     except Exception as e:
         return {**_fallback_response(), "_error": str(e)}
 

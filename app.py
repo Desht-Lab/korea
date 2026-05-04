@@ -129,7 +129,7 @@ ACCENT = "#376c8a"
 
 # ─── State ───────────────────────────────────────────────────────────────────
 if "page" not in st.session_state:
-    st.session_state.page = "dashboard"
+    st.session_state.page = "companies"
 if "selected_company" not in st.session_state:
     st.session_state.selected_company = None
 
@@ -193,16 +193,6 @@ def sidebar():
     with st.sidebar:
         st.markdown("## 🇰🇷 → 🇰🇿")
         st.markdown("**Korea–Kazakhstan**  \nOpportunity Radar")
-        st.markdown("---")
-
-        if st.button("📊 Дашборд", use_container_width=True):
-            st.session_state.page = "dashboard"
-            st.rerun()
-        if st.button("🏢 Список компаний", use_container_width=True):
-            st.session_state.page = "companies"
-            st.rerun()
-
-        st.markdown("---")
         # Load key: st.secrets (Streamlit Cloud) → .env
         try:
             _secret_key = st.secrets.get("GOOGLE_API_KEY", "")
@@ -488,7 +478,7 @@ def page_detail():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="kpi-label" style="margin-bottom:6px">Продукция и производственные мощности</div>', unsafe_allow_html=True)
-    prod_table = row.get("production_table")
+    prod_table = row.get("production_locations")
     if isinstance(prod_table, str):
         try:
             prod_table = json.loads(prod_table)
@@ -647,9 +637,7 @@ def _run_single_research(row):
 def main():
     sidebar()
     page = st.session_state.page
-    if page == "dashboard":
-        page_dashboard()
-    elif page == "companies":
+    if page == "companies":
         page_companies()
     elif page == "detail":
         page_detail()

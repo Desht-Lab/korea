@@ -121,7 +121,7 @@ def save_research(company_name: str, research: dict):
         "company_name": company_name,
         "last_updated": datetime.datetime.utcnow().isoformat(),
         "headquarters_location": _serialize(research.get("headquarters_location")),
-        "production_locations": _serialize(research.get("production_locations")),
+        "production_locations": _serialize(research.get("production_table")),
         "business_description": _serialize(research.get("business_description")),
         "main_products": _serialize(research.get("main_products")),
         "central_asia_presence": _serialize(research.get("central_asia_presence")),
