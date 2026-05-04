@@ -165,6 +165,7 @@ def research_company(company_name: str, sector: str, industry_name: str,
                     system_instruction=SYSTEM_PROMPT,
                     tools=[types.Tool(google_search=types.GoogleSearch())],
                     temperature=0.1,
+                    thinking_config=types.ThinkingConfig(thinking_budget=2048),
                 ),
             )
 
