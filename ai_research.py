@@ -4,6 +4,7 @@ Source URLs are extracted from grounding_metadata (actual site URLs, not search 
 """
 
 import json
+import time
 from google import genai
 from google.genai import types
 
@@ -153,34 +154,41 @@ def research_company(company_name: str, sector: str, industry_name: str,
         f"Верни строго JSON без markdown-обёртки."
     )
 
-    try:
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=0.1,
-            ),
-        )
+    last_error = "Unknown error"
+    for attempt in range(3):
+        text = ""
+        try:
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                    temperature=0.1,
+                ),
+            )
 
-        text = _get_response_text(response)
-        if not text:
-            return {**_fallback_response(), "_error": "Empty response from model"}
+            text = _get_response_text(response)
+            if not text:
+                last_error = "Empty response from model"
+                time.sleep(2 ** attempt)
+                continue
 
-        result = _extract_json(text)
+            result = _extract_json(text)
 
-        # Always override source_links with real grounded URLs from metadata
-        grounded_urls = _extract_grounding_urls(response)
-        result["source_links"] = grounded_urls if grounded_urls else result.get("source_links", [])
+            # Always override source_links with real grounded URLs from metadata
+            grounded_urls = _extract_grounding_urls(response)
+            result["source_links"] = grounded_urls if grounded_urls else result.get("source_links", [])
 
-        return result
+            return result
 
-    except json.JSONDecodeError as e:
-        raw_preview = (text[:300] if "text" in dir() else "")
-        return {**_fallback_response(), "_error": f"JSON parse error: {e} | Raw: {raw_preview}"}
-    except Exception as e:
-        return {**_fallback_response(), "_error": str(e)}
+        except json.JSONDecodeError as e:
+            last_error = f"JSON parse error: {e} | Raw: {text[:300]}"
+            time.sleep(2 ** attempt)
+        except Exception as e:
+            return {**_fallback_response(), "_error": str(e)}
+
+    return {**_fallback_response(), "_error": last_error}
 
 
 def _fallback_response() -> dict:
