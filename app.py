@@ -256,7 +256,7 @@ def page_dashboard():
         (c2, "Суммарная выручка", fmt_usd(total_rev), "последний период"),
         (c3, "Средняя выручка", fmt_usd(avg_rev), "на компанию"),
         (c4, "Исследовано AI", f"{researched}", f"из {total}"),
-        (c5, "Высокий приоритет КЗ", f"{high_kz}", "компаний"),
+        (c5, "Высокий приоритет РК", f"{high_kz}", "компаний"),
     ]:
         col.markdown(f"""
         <div class="kpi-card">
@@ -426,7 +426,7 @@ def page_detail():
     with col_h2:
         lk = row.get("likelihood_kz")
         if lk:
-            st.markdown(f"**Приоритет КЗ:**")
+            st.markdown(f"**Приоритет РК:**")
             st.markdown(badge(lk), unsafe_allow_html=True)
 
     # Research action buttons (top)
